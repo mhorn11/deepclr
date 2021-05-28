@@ -1,0 +1,153 @@
+diff --git a/evaluate_odometry.cpp b/evaluate_odometry.cpp
+index 4c55ee9..69f168c 100644
+--- a/evaluate_odometry.cpp
++++ b/evaluate_odometry.cpp
+@@ -4,7 +4,6 @@
+ #include <vector>
+ #include <limits>
+ 
+-#include "mail.h"
+ #include "matrix.h"
+ 
+ using namespace std;
+@@ -336,7 +335,7 @@ void plotErrorPlots (string dir,char* prefix) {
+ 
+       // save gnuplot instructions
+       if (j==0) {
+-        fprintf(fp,"set term png size 500,250 font \"Helvetica\" 11\n");
++        fprintf(fp,"set term png size 500,250 font \"sans\" 11\n");
+         fprintf(fp,"set output \"%s_%s.png\"\n",prefix,suffix);
+       } else {
+         fprintf(fp,"set term postscript eps enhanced color\n");
+@@ -405,66 +404,61 @@ void saveStats (vector<errors> err,string dir) {
+   fclose(fp);
+ }
+ 
+-bool eval (string result_sha,Mail* mail) {
++bool eval (string gt_dir,string pred_dir) {
+ 
+-  // ground truth and result directories
+-  string gt_dir         = "data/odometry/poses";
+-  string result_dir     = "results/" + result_sha;
++  // output directories
++  string result_dir     = pred_dir + "/result";
+   string error_dir      = result_dir + "/errors";
+   string plot_path_dir  = result_dir + "/plot_path";
+   string plot_error_dir = result_dir + "/plot_error";
+ 
+   // create output directories
+-  system(("mkdir " + error_dir).c_str());
+-  system(("mkdir " + plot_path_dir).c_str());
+-  system(("mkdir " + plot_error_dir).c_str());
+-  
++  system(("mkdir " + error_dir + " -p").c_str());
++  system(("mkdir " + plot_path_dir + " -p").c_str());
++  system(("mkdir " + plot_error_dir + " -p").c_str());
++
+   // total errors
+   vector<errors> total_err;
+ 
+   // for all sequences do
+-  for (int32_t i=11; i<22; i++) {
+-   
++  for (int32_t i=0; i<22; i++) {
++
+     // file name
+     char file_name[256];
+     sprintf(file_name,"%02d.txt",i);
+-    
++
+     // read ground truth and result poses
+     vector<Matrix> poses_gt     = loadPoses(gt_dir + "/" + file_name);
+-    vector<Matrix> poses_result = loadPoses(result_dir + "/data/" + file_name);
+-   
++    vector<Matrix> poses_result = loadPoses(pred_dir + "/" + file_name);
++
+     // plot status
+-    mail->msg("Processing: %s, poses: %d/%d",file_name,poses_result.size(),poses_gt.size());
+-    
++    printf("Processing: %s, poses: %ld/%ld\n",file_name,poses_result.size(),poses_gt.size());
++
+     // check for errors
+     if (poses_gt.size()==0 || poses_result.size()!=poses_gt.size()) {
+-      mail->msg("ERROR: Couldn't read (all) poses of: %s", file_name);
+-      return false;
++      printf("ERROR: Couldn't read (all) poses of: %s\n", file_name);
++      continue;
+     }
+ 
+-    // compute sequence errors    
++    // compute sequence errors
+     vector<errors> seq_err = calcSequenceErrors(poses_gt,poses_result);
+     saveSequenceErrors(seq_err,error_dir + "/" + file_name);
+     
+     // add to total errors
+     total_err.insert(total_err.end(),seq_err.begin(),seq_err.end());
+-    
+-    // for first half => plot trajectory and compute individual stats
+-    if (i<=15) {
+-    
+-      // save + plot bird's eye view trajectories
+-      savePathPlot(poses_gt,poses_result,plot_path_dir + "/" + file_name);
+-      vector<int32_t> roi = computeRoi(poses_gt,poses_result);
+-      plotPathPlot(plot_path_dir,roi,i);
+-
+-      // save + plot individual errors
+-      char prefix[16];
+-      sprintf(prefix,"%02d",i);
+-      saveErrorPlots(seq_err,plot_error_dir,prefix);
+-      plotErrorPlots(plot_error_dir,prefix);
+-    }
++
++    // save + plot bird's eye view trajectories
++    savePathPlot(poses_gt,poses_result,plot_path_dir + "/" + file_name);
++    vector<int32_t> roi = computeRoi(poses_gt,poses_result);
++    plotPathPlot(plot_path_dir,roi,i);
++
++    // save + plot individual errors
++    char prefix[16];
++    sprintf(prefix,"%02d",i);
++    saveErrorPlots(seq_err,plot_error_dir,prefix);
++    plotErrorPlots(plot_error_dir,prefix);
+   }
+-  
++
+   // save + plot total errors + summary statistics
+   if (total_err.size()>0) {
+     char prefix[16];
+@@ -480,28 +474,20 @@ bool eval (string result_sha,Mail* mail) {
+ 
+ int32_t main (int32_t argc,char *argv[]) {
+ 
+-  // we need 2 or 4 arguments!
+-  if (argc!=2 && argc!=4) {
+-    cout << "Usage: ./eval_odometry result_sha [user_sha email]" << endl;
++  // we need 3 arguments!
++  if (argc!=3) {
++    cout << "Usage: ./eval_odometry gt_dir pred_dir" << endl;
+     return 1;
+   }
+ 
+   // read arguments
+-  string result_sha = argv[1];
+-
+-  // init notification mail
+-  Mail *mail;
+-  if (argc==4) mail = new Mail(argv[3]);
+-  else         mail = new Mail();
+-  mail->msg("Thank you for participating in our evaluation!");
++  string gt_dir = argv[1];
++  string pred_dir = argv[2];
+ 
+   // run evaluation
+-  bool success = eval(result_sha,mail);
+-  if (argc==4) mail->finalize(success,"odometry",result_sha,argv[2]);
+-  else         mail->finalize(success,"odometry",result_sha);
++  bool success = eval(gt_dir, pred_dir);
+ 
+-  // send mail and exit
+-  delete mail;
++  // exit
+   return 0;
+ }
+ 

@@ -1,0 +1,8 @@
+name: kitti_07-10
+dataset_type: kitti_odometry_velodyne
+sequential: True
+data:
+  '07': '${KITTI_PATH}/odometry/07.lmdb'
+  '08': '${KITTI_PATH}/odometry/08.lmdb'
+  '09': '${KITTI_PATH}/odometry/09.lmdb'
+  '10': '${KITTI_PATH}/odometry/10.lmdb'

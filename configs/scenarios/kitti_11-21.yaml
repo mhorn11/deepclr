@@ -1,0 +1,15 @@
+name: kitti_11-21
+dataset_type: kitti_odometry_velodyne
+sequential: True
+data:
+  '11': '${KITTI_PATH}/odometry/11.lmdb'
+  '12': '${KITTI_PATH}/odometry/12.lmdb'
+  '13': '${KITTI_PATH}/odometry/13.lmdb'
+  '14': '${KITTI_PATH}/odometry/14.lmdb'
+  '15': '${KITTI_PATH}/odometry/15.lmdb'
+  '16': '${KITTI_PATH}/odometry/16.lmdb'
+  '17': '${KITTI_PATH}/odometry/17.lmdb'
+  '18': '${KITTI_PATH}/odometry/18.lmdb'
+  '19': '${KITTI_PATH}/odometry/19.lmdb'
+  '20': '${KITTI_PATH}/odometry/20.lmdb'
+  '21': '${KITTI_PATH}/odometry/21.lmdb'

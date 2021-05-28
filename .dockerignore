@@ -1,0 +1,18 @@
+# Git
+.git
+.gitignore
+
+# Docker
+.dockerignore
+
+# Python
+.mypy_cache
+.pytest_cache
+.venv
+build
+venv
+*.egg-info
+*.pyc
+
+# IDE
+.idea

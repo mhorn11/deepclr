@@ -1,0 +1,7 @@
+[submodule "extern/Pointnet2.PyTorch"]
+	path = extern/Pointnet2.PyTorch
+	url = https://github.com/sshaoshuai/Pointnet2.PyTorch
+	ignore = dirty
+[submodule "extern/gicp/gicp"]
+	path = extern/gicp/gicp
+	url = https://github.com/avsegal/gicp

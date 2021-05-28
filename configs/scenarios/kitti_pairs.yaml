@@ -1,0 +1,7 @@
+name: kitti_pairs
+dataset_type: generic
+sequential: False
+data:
+  '08': '${KITTI_PATH}/pairs_test/08.lmdb'
+  '09': '${KITTI_PATH}/pairs_test/09.lmdb'
+  '10': '${KITTI_PATH}/pairs_test/10.lmdb'

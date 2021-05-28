@@ -1,0 +1,48 @@
+weights: null
+input_dim: 3
+point_dim: 3
+label_type: POSE3D_DUAL_QUAT
+model_type: DEEPCLR
+params:
+  batch_norm: false
+  dropout: 1.0
+  cloud_features:
+    name: SetAbstraction
+    params:
+      npoint:
+      - 512
+      radii:
+      - - 0.1
+        - 0.2
+      nsamples:
+      - - 256
+        - 512
+      mlps:
+      - - - 16
+          - 16
+          - 32
+        - - 16
+          - 16
+          - 32
+  merge:
+    name: MotionEmbedding
+    params:
+      radius: 0.2
+      k: 30
+      mlp:
+      - 128
+      - 128
+      - 256
+  output:
+    name: OutputSimple
+    params:
+      mlp:
+      - 256
+      - 256
+      - 512
+      - 512
+      - 1024
+      linear:
+      - 1024
+      - 512
+      - 256

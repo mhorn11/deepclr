@@ -1,0 +1,105 @@
+base_dir: '${MODEL_PATH}'
+identifier: modelnet40
+device: cuda
+
+data:
+  training: '${MODELNET40_PATH}/models/train.lmdb'
+  validation: '${MODELNET40_PATH}/models/test_seen.lmdb'
+  dataset_type: modelnet40
+  sequential: False
+
+transforms:
+  on_validation: True
+  point_noise:
+    type: normal
+    scale: 0.02
+  translation_noise:
+    type: uniform
+    scale: 0.1
+  rotation_noise_deg:
+    type: uniform
+    scale: 5.0
+
+data_loader:
+  parallel_loading: True
+  num_workers: 6
+  batch_size: 5
+  buffer_size: 10
+
+model:
+  input_dim: 3
+  point_dim: 3
+  label_type: pose3d_dual_quat
+
+  model_type: deepclr
+  params:
+    batch_norm: False
+    dropout: 1.0
+
+    cloud_features:
+      name: SetAbstraction
+      params:
+        npoint: [512]
+        radii: [[0.1, 0.2]]
+        nsamples: [[256, 512]]
+        mlps: [[[16, 16, 32], [16, 16, 32]]]
+
+    merge:
+      name: MotionEmbedding
+      params:
+        radius: 0.2
+        k: 30
+        mlp: [128, 128, 256]
+
+    output:
+      name: OutputSimple
+      params:
+        mlp: [256, 256, 512, 512, 1024]
+        linear: [1024, 512, 256]
+
+metrics:
+  loss:
+    - type: trans
+      weights: [1.0]
+      params:
+        p: 2
+    - type: rot
+      weights: [1.0]
+      params:
+        p: 2
+  other:
+    - type: quat_norm
+    - type: dual_constraint
+
+optimizer:
+  name: Ranger
+  max_iterations: 700000
+  base_lr: 0.0005
+  weight_decay: 0.0
+  bias_lr_factor: 2.0
+  weight_decay_bias: 0.0
+  accumulation_steps: 2
+
+scheduler:
+  name: CyclicLRWithFlatAndCosineAnnealing
+  on_iteration: True
+  on_validation: False
+  needs_metrics: False
+  params:
+    cyclic_iterations: 600000
+    flat_iterations: 50000
+    annealing_iterations: 50000
+    base_lr: 0.00001
+    max_lr: 0.001
+    step_size_up: 4000
+    mode: triangular
+    cycle_momentum: False
+
+logging:
+  add_graph: False
+  summary_period: 10
+  log_period: 100
+  checkpoint_period: 24000
+  checkpoint_n_saved: 10
+  validation_period: 24000
+  running_average_alpha: 0.001

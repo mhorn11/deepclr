@@ -1,0 +1,36 @@
+input_dim: 4
+point_dim: 3
+label_type: pose3d_dual_quat
+
+model_type: deepclr
+params:
+  batch_norm: False
+  dropout: 1.0
+
+  cloud_features:
+    name: SetAbstraction
+    params:
+      npoint: [1024]
+      radii: [[0.5, 1.0]]
+      nsamples: [[512, 1024]]
+      mlps: [[[16, 16, 32], [16, 16, 32]]]
+
+  merge:
+    name: MotionEmbedding
+    params:
+      k: 20
+      radius: 10.0
+      mlp: [128, 128, 256]
+
+  output:
+    name: OutputSimple
+    params:
+      mlp: [256, 256, 512, 512, 1024]
+      linear: [1024, 512, 256]
+
+  loss:
+    name: TransformLoss
+    params:
+      p: 2
+      sx: 1
+      sq: 1

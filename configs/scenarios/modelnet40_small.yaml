@@ -1,0 +1,5 @@
+name: modelnet40_small
+dataset_type: generic
+sequential: False
+data:
+  'test_seen_0.02': '${MODELNET40_PATH}/test/test_seen_0.02.lmdb'

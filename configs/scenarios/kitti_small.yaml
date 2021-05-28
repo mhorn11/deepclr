@@ -1,0 +1,5 @@
+name: kitti_small
+dataset_type: kitti_odometry_velodyne
+sequential: True
+data:
+  '04': '${KITTI_PATH}/odometry/04.lmdb'

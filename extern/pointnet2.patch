@@ -1,0 +1,328 @@
+diff --git a/pointnet2/__init__.py b/pointnet2/__init__.py
+new file mode 100644
+index 0000000..ce55c43
+--- /dev/null
++++ b/pointnet2/__init__.py
+@@ -0,0 +1,3 @@
++from .pointnet2_modules import *
++from .pointnet2_utils import *
++from .pytorch_utils import *
+diff --git a/pointnet2/pointnet2_modules.py b/pointnet2/pointnet2_modules.py
+index 5f125ce..1dcbb14 100644
+--- a/pointnet2/pointnet2_modules.py
++++ b/pointnet2/pointnet2_modules.py
+@@ -7,6 +7,9 @@ from . import pytorch_utils as pt_utils
+ from typing import List
+ 
+ 
++__all__ = ['PointnetSAModuleMSG', 'PointnetSAModule', 'PointnetFPModule']
++
++
+ class _PointnetSAModuleBase(nn.Module):
+ 
+     def __init__(self):
+diff --git a/pointnet2/pointnet2_utils.py b/pointnet2/pointnet2_utils.py
+index e814102..4aab84f 100644
+--- a/pointnet2/pointnet2_utils.py
++++ b/pointnet2/pointnet2_utils.py
+@@ -7,6 +7,12 @@ from typing import Tuple
+ import pointnet2_cuda as pointnet2
+ 
+ 
++__all__ = ['FurthestPointSampling', 'furthest_point_sample', 'GatherOperation', 'gather_operation',
++           'ThreeNN', 'three_nn', 'ThreeInterpolate', 'three_interpolate',
++           'GroupingOperation', 'grouping_operation', 'BallQuery', 'ball_query',
++           'QueryAndGroup', 'GroupAll']
++
++
+ class FurthestPointSampling(Function):
+     @staticmethod
+     def forward(ctx, xyz: torch.Tensor, npoint: int) -> torch.Tensor:
+diff --git a/pointnet2/pytorch_utils.py b/pointnet2/pytorch_utils.py
+index 09cb7bc..6f526cd 100644
+--- a/pointnet2/pytorch_utils.py
++++ b/pointnet2/pytorch_utils.py
+@@ -2,6 +2,9 @@ import torch.nn as nn
+ from typing import List, Tuple
+ 
+ 
++__all__ = ['SharedMLP', 'BatchNorm1d', 'BatchNorm2d', 'Conv1d', 'Conv2d', 'FC']
++
++
+ class SharedMLP(nn.Sequential):
+ 
+     def __init__(
+diff --git a/pointnet2/setup.py b/setup.py
+similarity index 82%
+rename from pointnet2/setup.py
+rename to setup.py
+index 99e59e3..987ffbb 100644
+--- a/pointnet2/setup.py
++++ b/setup.py
+@@ -1,8 +1,9 @@
+-from setuptools import setup
++from setuptools import setup, find_packages
+ from torch.utils.cpp_extension import BuildExtension, CUDAExtension
+ 
+ setup(
+     name='pointnet2',
++    packages=['pointnet2'],
+     ext_modules=[
+         CUDAExtension('pointnet2_cuda', [
+             'src/pointnet2_api.cpp',
+@@ -16,7 +17,7 @@ setup(
+             'src/sampling.cpp', 
+             'src/sampling_gpu.cu',
+         ],
+-        extra_compile_args={'cxx': ['-g'],
++        extra_compile_args={'cxx': ['-g', '-fopenmp'],
+                             'nvcc': ['-O2']})
+     ],
+     cmdclass={'build_ext': BuildExtension}
+diff --git a/pointnet2/src/ball_query.cpp b/src/ball_query.cpp
+similarity index 57%
+rename from pointnet2/src/ball_query.cpp
+rename to src/ball_query.cpp
+index c5b06e1..dfef079 100644
+--- a/pointnet2/src/ball_query.cpp
++++ b/src/ball_query.cpp
+@@ -5,21 +5,19 @@
+ #include <cuda_runtime_api.h>
+ #include "ball_query_gpu.h"
+ 
+-extern THCState *state;
+-
+-#define CHECK_CUDA(x) AT_CHECK(x.type().is_cuda(), #x, " must be a CUDAtensor ")
+-#define CHECK_CONTIGUOUS(x) AT_CHECK(x.is_contiguous(), #x, " must be contiguous ")
++#define CHECK_CUDA(x) TORCH_CHECK(x.is_cuda(), #x, " must be a CUDAtensor ")
++#define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x, " must be contiguous ")
+ #define CHECK_INPUT(x) CHECK_CUDA(x);CHECK_CONTIGUOUS(x)
+ 
+ int ball_query_wrapper_fast(int b, int n, int m, float radius, int nsample, 
+     at::Tensor new_xyz_tensor, at::Tensor xyz_tensor, at::Tensor idx_tensor) {
+     CHECK_INPUT(new_xyz_tensor);
+     CHECK_INPUT(xyz_tensor);
+-    const float *new_xyz = new_xyz_tensor.data<float>();
+-    const float *xyz = xyz_tensor.data<float>();
+-    int *idx = idx_tensor.data<int>();
++    const float *new_xyz = new_xyz_tensor.data_ptr<float>();
++    const float *xyz = xyz_tensor.data_ptr<float>();
++    int *idx = idx_tensor.data_ptr<int>();
+     
+-    cudaStream_t stream = THCState_getCurrentStream(state);
++    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+     ball_query_kernel_launcher_fast(b, n, m, radius, nsample, new_xyz, xyz, idx, stream);
+     return 1;
+ }
+\ No newline at end of file
+diff --git a/pointnet2/src/ball_query_gpu.cu b/src/ball_query_gpu.cu
+similarity index 100%
+rename from pointnet2/src/ball_query_gpu.cu
+rename to src/ball_query_gpu.cu
+diff --git a/pointnet2/src/ball_query_gpu.h b/src/ball_query_gpu.h
+similarity index 100%
+rename from pointnet2/src/ball_query_gpu.h
+rename to src/ball_query_gpu.h
+diff --git a/pointnet2/src/cuda_utils.h b/src/cuda_utils.h
+similarity index 100%
+rename from pointnet2/src/cuda_utils.h
+rename to src/cuda_utils.h
+diff --git a/pointnet2/src/group_points.cpp b/src/group_points.cpp
+similarity index 61%
+rename from pointnet2/src/group_points.cpp
+rename to src/group_points.cpp
+index 6bb577d..3460d6a 100644
+--- a/pointnet2/src/group_points.cpp
++++ b/src/group_points.cpp
+@@ -5,17 +5,15 @@
+ #include <THC/THC.h>
+ #include "group_points_gpu.h"
+ 
+-extern THCState *state;
+-
+ 
+ int group_points_grad_wrapper_fast(int b, int c, int n, int npoints, int nsample, 
+     at::Tensor grad_out_tensor, at::Tensor idx_tensor, at::Tensor grad_points_tensor) {
+ 
+-    float *grad_points = grad_points_tensor.data<float>();
+-    const int *idx = idx_tensor.data<int>();
+-    const float *grad_out = grad_out_tensor.data<float>();
++    float *grad_points = grad_points_tensor.data_ptr<float>();
++    const int *idx = idx_tensor.data_ptr<int>();
++    const float *grad_out = grad_out_tensor.data_ptr<float>();
+ 
+-    cudaStream_t stream = THCState_getCurrentStream(state);
++    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+ 
+     group_points_grad_kernel_launcher_fast(b, c, n, npoints, nsample, grad_out, idx, grad_points, stream);
+     return 1;
+@@ -25,11 +23,11 @@ int group_points_grad_wrapper_fast(int b, int c, int n, int npoints, int nsample
+ int group_points_wrapper_fast(int b, int c, int n, int npoints, int nsample, 
+     at::Tensor points_tensor, at::Tensor idx_tensor, at::Tensor out_tensor) {
+ 
+-    const float *points = points_tensor.data<float>();
+-    const int *idx = idx_tensor.data<int>();
+-    float *out = out_tensor.data<float>();
++    const float *points = points_tensor.data_ptr<float>();
++    const int *idx = idx_tensor.data_ptr<int>();
++    float *out = out_tensor.data_ptr<float>();
+ 
+-    cudaStream_t stream = THCState_getCurrentStream(state);
++    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+ 
+     group_points_kernel_launcher_fast(b, c, n, npoints, nsample, points, idx, out, stream);
+     return 1;
+diff --git a/pointnet2/src/group_points_gpu.cu b/src/group_points_gpu.cu
+similarity index 100%
+rename from pointnet2/src/group_points_gpu.cu
+rename to src/group_points_gpu.cu
+diff --git a/pointnet2/src/group_points_gpu.h b/src/group_points_gpu.h
+similarity index 100%
+rename from pointnet2/src/group_points_gpu.h
+rename to src/group_points_gpu.h
+diff --git a/pointnet2/src/interpolate.cpp b/src/interpolate.cpp
+similarity index 58%
+rename from pointnet2/src/interpolate.cpp
+rename to src/interpolate.cpp
+index 6c1724c..dc13043 100644
+--- a/pointnet2/src/interpolate.cpp
++++ b/src/interpolate.cpp
+@@ -8,17 +8,15 @@
+ #include <cuda_runtime_api.h>
+ #include "interpolate_gpu.h"
+ 
+-extern THCState *state;
+-
+ 
+ void three_nn_wrapper_fast(int b, int n, int m, at::Tensor unknown_tensor, 
+     at::Tensor known_tensor, at::Tensor dist2_tensor, at::Tensor idx_tensor) {
+-    const float *unknown = unknown_tensor.data<float>();
+-    const float *known = known_tensor.data<float>();
+-    float *dist2 = dist2_tensor.data<float>();
+-    int *idx = idx_tensor.data<int>();
++    const float *unknown = unknown_tensor.data_ptr<float>();
++    const float *known = known_tensor.data_ptr<float>();
++    float *dist2 = dist2_tensor.data_ptr<float>();
++    int *idx = idx_tensor.data_ptr<int>();
+ 
+-    cudaStream_t stream = THCState_getCurrentStream(state);
++    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+     three_nn_kernel_launcher_fast(b, n, m, unknown, known, dist2, idx, stream);
+ }
+ 
+@@ -29,12 +27,12 @@ void three_interpolate_wrapper_fast(int b, int c, int m, int n,
+                          at::Tensor weight_tensor,
+                          at::Tensor out_tensor) {
+ 
+-    const float *points = points_tensor.data<float>();
+-    const float *weight = weight_tensor.data<float>();
+-    float *out = out_tensor.data<float>();
+-    const int *idx = idx_tensor.data<int>();
++    const float *points = points_tensor.data_ptr<float>();
++    const float *weight = weight_tensor.data_ptr<float>();
++    float *out = out_tensor.data_ptr<float>();
++    const int *idx = idx_tensor.data_ptr<int>();
+ 
+-    cudaStream_t stream = THCState_getCurrentStream(state);
++    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+     three_interpolate_kernel_launcher_fast(b, c, m, n, points, idx, weight, out, stream);
+ }
+ 
+@@ -44,11 +42,11 @@ void three_interpolate_grad_wrapper_fast(int b, int c, int n, int m,
+                             at::Tensor weight_tensor,
+                             at::Tensor grad_points_tensor) {
+ 
+-    const float *grad_out = grad_out_tensor.data<float>();
+-    const float *weight = weight_tensor.data<float>();
+-    float *grad_points = grad_points_tensor.data<float>();
+-    const int *idx = idx_tensor.data<int>();
++    const float *grad_out = grad_out_tensor.data_ptr<float>();
++    const float *weight = weight_tensor.data_ptr<float>();
++    float *grad_points = grad_points_tensor.data_ptr<float>();
++    const int *idx = idx_tensor.data_ptr<int>();
+ 
+-    cudaStream_t stream = THCState_getCurrentStream(state);
++    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+     three_interpolate_grad_kernel_launcher_fast(b, c, n, m, grad_out, idx, weight, grad_points, stream);
+ }
+\ No newline at end of file
+diff --git a/pointnet2/src/interpolate_gpu.cu b/src/interpolate_gpu.cu
+similarity index 100%
+rename from pointnet2/src/interpolate_gpu.cu
+rename to src/interpolate_gpu.cu
+diff --git a/pointnet2/src/interpolate_gpu.h b/src/interpolate_gpu.h
+similarity index 100%
+rename from pointnet2/src/interpolate_gpu.h
+rename to src/interpolate_gpu.h
+diff --git a/pointnet2/src/pointnet2_api.cpp b/src/pointnet2_api.cpp
+similarity index 100%
+rename from pointnet2/src/pointnet2_api.cpp
+rename to src/pointnet2_api.cpp
+diff --git a/pointnet2/src/sampling.cpp b/src/sampling.cpp
+similarity index 57%
+rename from pointnet2/src/sampling.cpp
+rename to src/sampling.cpp
+index e0c9df0..c4ff682 100644
+--- a/pointnet2/src/sampling.cpp
++++ b/src/sampling.cpp
+@@ -5,16 +5,14 @@
+ 
+ #include "sampling_gpu.h"
+ 
+-extern THCState *state;
+-
+ 
+ int gather_points_wrapper_fast(int b, int c, int n, int npoints, 
+     at::Tensor points_tensor, at::Tensor idx_tensor, at::Tensor out_tensor){
+-    const float *points = points_tensor.data<float>();
+-    const int *idx = idx_tensor.data<int>();
+-    float *out = out_tensor.data<float>();
++    const float *points = points_tensor.data_ptr<float>();
++    const int *idx = idx_tensor.data_ptr<int>();
++    float *out = out_tensor.data_ptr<float>();
+ 
+-    cudaStream_t stream = THCState_getCurrentStream(state);
++    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+     gather_points_kernel_launcher_fast(b, c, n, npoints, points, idx, out, stream);
+     return 1;
+ }
+@@ -23,11 +21,11 @@ int gather_points_wrapper_fast(int b, int c, int n, int npoints,
+ int gather_points_grad_wrapper_fast(int b, int c, int n, int npoints, 
+     at::Tensor grad_out_tensor, at::Tensor idx_tensor, at::Tensor grad_points_tensor) {
+ 
+-    const float *grad_out = grad_out_tensor.data<float>();
+-    const int *idx = idx_tensor.data<int>();
+-    float *grad_points = grad_points_tensor.data<float>();
++    const float *grad_out = grad_out_tensor.data_ptr<float>();
++    const int *idx = idx_tensor.data_ptr<int>();
++    float *grad_points = grad_points_tensor.data_ptr<float>();
+ 
+-    cudaStream_t stream = THCState_getCurrentStream(state);
++    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+     gather_points_grad_kernel_launcher_fast(b, c, n, npoints, grad_out, idx, grad_points, stream);
+     return 1;
+ }
+@@ -36,11 +34,11 @@ int gather_points_grad_wrapper_fast(int b, int c, int n, int npoints,
+ int furthest_point_sampling_wrapper(int b, int n, int m, 
+     at::Tensor points_tensor, at::Tensor temp_tensor, at::Tensor idx_tensor) {
+ 
+-    const float *points = points_tensor.data<float>();
+-    float *temp = temp_tensor.data<float>();
+-    int *idx = idx_tensor.data<int>();
++    const float *points = points_tensor.data_ptr<float>();
++    float *temp = temp_tensor.data_ptr<float>();
++    int *idx = idx_tensor.data_ptr<int>();
+ 
+-    cudaStream_t stream = THCState_getCurrentStream(state);
++    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+     furthest_point_sampling_kernel_launcher(b, n, m, points, temp, idx, stream);
+     return 1;
+ }
+diff --git a/pointnet2/src/sampling_gpu.cu b/src/sampling_gpu.cu
+similarity index 100%
+rename from pointnet2/src/sampling_gpu.cu
+rename to src/sampling_gpu.cu
+diff --git a/pointnet2/src/sampling_gpu.h b/src/sampling_gpu.h
+similarity index 100%
+rename from pointnet2/src/sampling_gpu.h
+rename to src/sampling_gpu.h

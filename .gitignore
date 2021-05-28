@@ -1,0 +1,11 @@
+# Python
+.mypy_cache
+.pytest_cache
+.venv
+build
+venv
+*.egg-info
+*.pyc
+
+# IDE
+.idea

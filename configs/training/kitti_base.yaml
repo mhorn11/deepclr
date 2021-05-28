@@ -1,0 +1,86 @@
+base_dir: '${MODEL_PATH}'
+device: cuda
+
+data_loader:
+  parallel_loading: True
+  num_workers: 6
+  batch_size: 5
+  buffer_size: 10
+
+model:
+  input_dim: 4
+  point_dim: 3
+  label_type: pose3d_dual_quat
+
+  model_type: deepclr
+  params:
+    batch_norm: False
+    dropout: 1.0
+
+    cloud_features:
+      name: SetAbstraction
+      params:
+        npoint: [1024]
+        radii: [[0.5, 1.0]]
+        nsamples: [[512, 1024]]
+        mlps: [[[16, 16, 32], [16, 16, 32]]]
+
+    merge:
+      name: MotionEmbedding
+      params:
+        k: 20
+        radius: 10.0
+        mlp: [128, 128, 256]
+
+    output:
+      name: OutputSimple
+      params:
+        mlp: [256, 256, 512, 512, 1024]
+        linear: [1024, 512, 256]
+
+metrics:
+  loss:
+    - type: trans
+      weights: [1.0]
+      params:
+        p: 2
+    - type: rot
+      weights: [200.0]
+      params:
+        p: 2
+  other:
+    - type: quat_norm
+    - type: dual_constraint
+
+optimizer:
+  name: Ranger
+  max_iterations: 800000
+  base_lr: 0.0005
+  weight_decay: 0.001
+  bias_lr_factor: 2.0
+  weight_decay_bias: 0.0
+  accumulation_steps: 2
+
+scheduler:
+  name: CyclicLRWithFlatAndCosineAnnealing
+  on_iteration: True
+  on_validation: False
+  needs_metrics: False
+  params:
+    cyclic_iterations: 600000
+    flat_iterations: 100000
+    annealing_iterations: 100000
+    base_lr: 0.0000001
+    max_lr: 0.0005
+    step_size_up: 4000
+    mode: triangular
+    cycle_momentum: False
+
+logging:
+  add_graph: False
+  summary_period: 20
+  log_period: 200
+  checkpoint_period: 24000
+  checkpoint_n_saved: 10
+  validation_period: 24000
+  running_average_alpha: 0.001

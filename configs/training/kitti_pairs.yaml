@@ -1,0 +1,30 @@
+extends: 'kitti_base.yaml'
+
+identifier: kitti_pairs
+
+data:
+  training: ['${KITTI_PATH}/pairs/00.lmdb',
+             '${KITTI_PATH}/pairs/01.lmdb',
+             '${KITTI_PATH}/pairs/02.lmdb',
+             '${KITTI_PATH}/pairs/03.lmdb',
+             '${KITTI_PATH}/pairs/04.lmdb',
+             '${KITTI_PATH}/pairs/05.lmdb',
+             '${KITTI_PATH}/pairs/06.lmdb',
+             '${KITTI_PATH}/pairs/07.lmdb']
+  validation: ['${KITTI_PATH}/pairs/08.lmdb',
+               '${KITTI_PATH}/pairs/09.lmdb',
+               '${KITTI_PATH}/pairs/10.lmdb']
+  dataset_type: generic
+  sequential: False
+
+transforms:
+  on_validation: True
+  point_noise:
+    type: normal
+    scale: 0.01
+  translation_noise:
+    type: uniform
+    scale: 1.0
+  rotation_noise_deg:
+    type: uniform
+    scale: 1.0

@@ -1,0 +1,15 @@
+name: modelnet40_seen
+dataset_type: generic
+sequential: False
+data:
+  'test_seen_0.00': '${MODELNET40_PATH}/test/test_seen_0.00.lmdb'
+  'test_seen_0.01': '${MODELNET40_PATH}/test/test_seen_0.01.lmdb'
+  'test_seen_0.02': '${MODELNET40_PATH}/test/test_seen_0.02.lmdb'
+  'test_seen_0.03': '${MODELNET40_PATH}/test/test_seen_0.03.lmdb'
+  'test_seen_0.04': '${MODELNET40_PATH}/test/test_seen_0.04.lmdb'
+  'test_seen_0.05': '${MODELNET40_PATH}/test/test_seen_0.05.lmdb'
+  'test_seen_0.06': '${MODELNET40_PATH}/test/test_seen_0.06.lmdb'
+  'test_seen_0.07': '${MODELNET40_PATH}/test/test_seen_0.07.lmdb'
+  'test_seen_0.08': '${MODELNET40_PATH}/test/test_seen_0.08.lmdb'
+  'test_seen_0.09': '${MODELNET40_PATH}/test/test_seen_0.09.lmdb'
+  'test_seen_0.10': '${MODELNET40_PATH}/test/test_seen_0.10.lmdb'
